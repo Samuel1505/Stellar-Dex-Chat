@@ -28,6 +28,19 @@ pub struct WithdrawRequest {
     pub unlock_ledger: u32,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Receipt {
+    pub id: u64,
+    pub depositor: Address,
+    pub amount: i128,
+    pub ledger: u32,
+    pub reference: Bytes,
+}
+
+/// Maximum allowed length for a deposit reference (bytes).
+const MAX_REFERENCE_LEN: u32 = 64;
+
 // ── Storage keys ──────────────────────────────────────────────────────────
 #[contracttype]
 pub enum DataKey {
@@ -86,8 +99,14 @@ impl FiatBridge {
         Ok(())
     }
 
-    /// Lock tokens inside the bridge. Caller must authorise.
-    pub fn deposit(env: Env, from: Address, amount: i128) -> Result<(), Error> {
+    /// Lock tokens inside the bridge and issue a deposit receipt.
+    /// Returns the unique receipt ID on success.
+    pub fn deposit(
+        env: Env,
+        from: Address,
+        amount: i128,
+        reference: Bytes,
+    ) -> Result<u64, Error> {
         from.require_auth();
 
         // Allowlist gate: when enabled, only approved addresses may deposit.
@@ -128,6 +147,27 @@ impl FiatBridge {
             &amount,
         );
 
+        // ── Create deposit receipt ────────────────────────────────────
+        let receipt_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::ReceiptCounter)
+            .unwrap_or(0);
+        let receipt = Receipt {
+            id: receipt_id,
+            depositor: from.clone(),
+            amount,
+            ledger: env.ledger().sequence(),
+            reference,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Receipt(receipt_id), &receipt);
+        env.storage()
+            .instance()
+            .set(&DataKey::ReceiptCounter, &(receipt_id + 1));
+
+        // ── Update totals ─────────────────────────────────────────────
         let total: i128 = env
             .storage()
             .instance()
@@ -137,9 +177,13 @@ impl FiatBridge {
             .instance()
             .set(&DataKey::TotalDeposited, &(total + amount));
 
+        // ── Events ────────────────────────────────────────────────────
         env.events()
             .publish((Symbol::new(&env, "deposit"), from), amount);
-        Ok(())
+        env.events()
+            .publish((Symbol::new(&env, "receipt_issued"),), receipt_id);
+
+        Ok(receipt_id)
     }
 
     /// Withdraw tokens from the bridge. Caller must authorise.

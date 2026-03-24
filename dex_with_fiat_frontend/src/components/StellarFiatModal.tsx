@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Loader2,
@@ -16,12 +16,17 @@ import {
   withdrawFromContract,
   stroopsToDisplay,
 } from '@/lib/stellarContract';
+import {
+  getTokenPrice,
+  formatFiatAmount,
+} from '@/lib/cryptoPriceService';
 import SkeletonPayout from '@/components/ui/skeleton/SkeletonPayout';
 
 interface StellarFiatModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultAmount?: string;
+  fiatCurrency?: string;
   isAdminMode?: boolean;
   recipientAddress?: string;
   onDepositSuccess?: (xlmAmount: number) => void;
@@ -56,6 +61,7 @@ export default function StellarFiatModal({
   isOpen,
   onClose,
   defaultAmount = '',
+  fiatCurrency = 'usd',
   isAdminMode = false,
   recipientAddress = '',
   onDepositSuccess,
@@ -65,6 +71,7 @@ export default function StellarFiatModal({
   const [amount, setAmount] = useState(defaultAmount);
   const [activePreset, setActivePreset] = useState<number | null>(null);
   const [recipient, setRecipient] = useState(recipientAddress);
+  const [fiatEstimate, setFiatEstimate] = useState<string | null>(null);
 
   const AMOUNT_PRESETS = [5, 10, 25, 50, 100];
 
@@ -134,6 +141,25 @@ export default function StellarFiatModal({
       cancelled = true;
     };
   }, [defaultAmount, isAdminMode, isOpen, recipientAddress]);
+
+  // Live fiat estimate: recalculate whenever amount or fiatCurrency changes
+  const updateFiatEstimate = useCallback(async () => {
+    const xlm = parseFloat(amount);
+    if (!xlm || xlm <= 0) {
+      setFiatEstimate(null);
+      return;
+    }
+    try {
+      const price = await getTokenPrice('XLM', fiatCurrency);
+      setFiatEstimate(formatFiatAmount(xlm * price, fiatCurrency));
+    } catch {
+      setFiatEstimate(null);
+    }
+  }, [amount, fiatCurrency]);
+
+  useEffect(() => {
+    updateFiatEstimate();
+  }, [updateFiatEstimate]);
 
   if (!isOpen) return null;
 
@@ -330,6 +356,14 @@ export default function StellarFiatModal({
                 className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none ${isOverLimit ? 'border-red-500 focus:border-red-400' : 'border-gray-600 focus:border-blue-500'}`}
               />
             </div>
+
+            {/* Fiat estimate */}
+            {fiatEstimate && (
+              <p className="text-xs text-gray-400 -mt-2 mb-4">
+                ≈ <span className="text-white font-medium">{fiatEstimate}</span>{' '}
+                at current market rate
+              </p>
+            )}
 
             {isDepositFlow && (
               <div className="mb-4 rounded-xl border border-gray-700 bg-gray-800/60 px-4 py-3">

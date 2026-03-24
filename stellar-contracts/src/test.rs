@@ -5,7 +5,7 @@ use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
-    Address, Env,
+    Address, Bytes, Env,
 };
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ fn test_deposit_and_withdraw() {
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
 
-    bridge.deposit(&user, &200);
+    bridge.deposit(&user, &200, &Bytes::new(&env));
     assert_eq!(token.balance(&user), 800);
     assert_eq!(token.balance(&contract_id), 200);
 
@@ -76,7 +76,7 @@ fn test_time_locked_withdrawal() {
     let (contract_id, bridge, _, _, token, token_sac) = setup_bridge(&env, 500);
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
-    bridge.deposit(&user, &200);
+    bridge.deposit(&user, &200, &Bytes::new(&env));
 
     bridge.set_lock_period(&100);
     assert_eq!(bridge.get_lock_period(), 100);
@@ -113,7 +113,7 @@ fn test_cancel_withdrawal() {
     let (_, bridge, _, _, _, token_sac) = setup_bridge(&env, 500);
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
-    bridge.deposit(&user, &200);
+    bridge.deposit(&user, &200, &Bytes::new(&env));
 
     let req_id = bridge.request_withdrawal(&user, &100);
     assert!(bridge.get_withdrawal_request(&req_id).is_some());
@@ -140,11 +140,11 @@ fn test_view_functions() {
     assert_eq!(bridge.get_balance(), 0);
     assert_eq!(bridge.get_total_deposited(), 0);
 
-    bridge.deposit(&user, &200);
+    bridge.deposit(&user, &200, &Bytes::new(&env));
     assert_eq!(bridge.get_balance(), 200);
     assert_eq!(bridge.get_total_deposited(), 200);
 
-    bridge.deposit(&user, &100);
+    bridge.deposit(&user, &100, &Bytes::new(&env));
     assert_eq!(bridge.get_total_deposited(), 300);
 }
 
@@ -180,7 +180,7 @@ fn test_deposit_and_withdraw_events() {
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
 
-    bridge.deposit(&user, &200);
+    bridge.deposit(&user, &200, &Bytes::new(&env));
     let deposit_events = std::format!("{:?}", env.events().all());
     assert!(deposit_events.contains("deposit"));
     assert!(deposit_events.contains("lo: 200"));
@@ -202,7 +202,7 @@ fn test_over_limit_deposit() {
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
 
-    let result = bridge.try_deposit(&user, &600);
+    let result = bridge.try_deposit(&user, &600, &Bytes::new(&env));
     assert_eq!(result, Err(Ok(Error::ExceedsLimit)));
 }
 
@@ -214,7 +214,7 @@ fn test_zero_amount_deposit() {
     let (_, bridge, _, _, _, _) = setup_bridge(&env, 500);
     let user = Address::generate(&env);
 
-    let result = bridge.try_deposit(&user, &0);
+    let result = bridge.try_deposit(&user, &0, &Bytes::new(&env));
     assert_eq!(result, Err(Ok(Error::ZeroAmount)));
 }
 
@@ -226,7 +226,7 @@ fn test_insufficient_funds_withdraw() {
     let (_, bridge, _, _, _, token_sac) = setup_bridge(&env, 500);
     let user = Address::generate(&env);
     token_sac.mint(&user, &1_000);
-    bridge.deposit(&user, &100);
+    bridge.deposit(&user, &100, &Bytes::new(&env));
 
     let req_id = bridge.request_withdrawal(&user, &200);
     let result = bridge.try_execute_withdrawal(&req_id);
