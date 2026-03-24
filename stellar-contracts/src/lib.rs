@@ -14,9 +14,10 @@ pub enum Error {
     ZeroAmount = 4,
     ExceedsLimit = 5,
     InsufficientFunds = 6,
-    WithdrawalLocked = 7,
-    RequestNotFound = 8,
-    ReferenceTooLong = 9,
+    ContractPaused = 7,
+    WithdrawalLocked = 8,
+    RequestNotFound = 9,
+    ReferenceTooLong = 10,
 }
 
 // ── Models ────────────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ pub enum DataKey {
     BridgeLimit,
     TotalDeposited,
     LockPeriod,
+    Paused,
     WithdrawQueue(u64),
     NextRequestID,
     ReceiptCounter,
@@ -75,6 +77,7 @@ impl FiatBridge {
         env.storage()
             .instance()
             .set(&DataKey::TotalDeposited, &0_i128);
+        env.storage().instance().set(&DataKey::Paused, &false);
         Ok(())
     }
 
@@ -86,6 +89,9 @@ impl FiatBridge {
         amount: i128,
         reference: Bytes,
     ) -> Result<u64, Error> {
+        if Self::is_paused(env.clone()) {
+            return Err(Error::ContractPaused);
+        }
         from.require_auth();
 
         if reference.len() > MAX_REFERENCE_LEN {
@@ -154,6 +160,9 @@ impl FiatBridge {
 
     /// Withdraw tokens from the bridge. Caller must authorise.
     pub fn withdraw(env: Env, to: Address, amount: i128) -> Result<(), Error> {
+        if Self::is_paused(env.clone()) {
+            return Err(Error::ContractPaused);
+        }
         to.require_auth();
         if amount <= 0 {
             return Err(Error::ZeroAmount);
@@ -314,6 +323,28 @@ impl FiatBridge {
         Ok(())
     }
 
+    pub fn pause(env: Env) -> Result<(), Error> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(Error::NotInitialized)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &true);
+        Ok(())
+    }
+
+    pub fn unpause(env: Env) -> Result<(), Error> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(Error::NotInitialized)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &false);
+        Ok(())
+    }
+
     // ── View functions ────────────────────────────────────────────────────
     pub fn get_admin(env: Env) -> Result<Address, Error> {
         env.storage()
@@ -358,6 +389,10 @@ impl FiatBridge {
     /// Get the current lock period in ledgers.
     pub fn get_lock_period(env: Env) -> u32 {
         env.storage().instance().get(&DataKey::LockPeriod).unwrap_or(0)
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
     }
 
     // ── Receipt view functions ─────────────────────────────────────────

@@ -243,6 +243,77 @@ fn test_double_init() {
     assert_eq!(result, Err(Ok(Error::AlreadyInitialized)));
 }
 
+#[test]
+fn test_deposit_fails_when_paused() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_, bridge, _, _, _, token_sac) = setup_bridge(&env, 500);
+    let user = Address::generate(&env);
+    token_sac.mint(&user, &1_000);
+
+    assert_eq!(bridge.is_paused(), false);
+    bridge.pause();
+    assert_eq!(bridge.is_paused(), true);
+
+    let result = bridge.try_deposit(&user, &100, &Bytes::new(&env));
+    assert_eq!(result, Err(Ok(Error::ContractPaused)));
+}
+
+#[test]
+fn test_withdraw_fails_when_paused() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_, bridge, _, _, token, token_sac) = setup_bridge(&env, 500);
+    let user = Address::generate(&env);
+    token_sac.mint(&user, &1_000);
+
+    bridge.deposit(&user, &200, &Bytes::new(&env));
+    assert_eq!(token.balance(&user), 800);
+
+    bridge.pause();
+    let result = bridge.try_withdraw(&user, &50);
+    assert_eq!(result, Err(Ok(Error::ContractPaused)));
+}
+
+#[test]
+fn test_deposit_and_withdraw_succeed_after_unpause() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (contract_id, bridge, _, _, token, token_sac) = setup_bridge(&env, 500);
+    let user = Address::generate(&env);
+    token_sac.mint(&user, &1_000);
+
+    bridge.pause();
+    assert_eq!(bridge.try_deposit(&user, &100, &Bytes::new(&env)), Err(Ok(Error::ContractPaused)));
+
+    bridge.unpause();
+    assert_eq!(bridge.is_paused(), false);
+
+    bridge.deposit(&user, &100, &Bytes::new(&env));
+    assert_eq!(token.balance(&user), 900);
+    assert_eq!(token.balance(&contract_id), 100);
+
+    bridge.withdraw(&user, &50);
+    assert_eq!(token.balance(&user), 950);
+    assert_eq!(token.balance(&contract_id), 50);
+}
+
+#[test]
+fn test_non_admin_cannot_pause_or_unpause() {
+    let env = Env::default();
+
+    let (_, bridge, _admin, _token_addr, _, _) = setup_bridge(&env, 500);
+
+    let pause_res = bridge.try_pause();
+    assert!(matches!(pause_res, Err(Err(_))));
+
+    let unpause_res = bridge.try_unpause();
+    assert!(matches!(unpause_res, Err(Err(_))));
+}
+
 // ── Receipt tests ───────────────────────────────────────────────────
 
 #[test]
