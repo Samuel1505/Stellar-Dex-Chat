@@ -8,6 +8,9 @@ import {
   scValToNative,
   rpc,
 } from '@stellar/stellar-sdk';
+import { stroopsToXlm } from '@/lib/stroops';
+
+export { stroopsToXlm as stroopsToDisplay } from '@/lib/stroops';
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_STELLAR_RPC_URL ||
@@ -316,7 +319,7 @@ export async function validateBridgeAmountLimit(amount: bigint): Promise<bigint>
 
   if (amount > limit) {
     throw new Error(
-      `Requested amount exceeds the current bridge limit of ${stroopsToDisplay(limit)} XLM.`,
+      `Requested amount exceeds the current bridge limit of ${stroopsToXlm(limit)} XLM.`,
     );
   }
 
@@ -328,11 +331,3 @@ export async function getTotalDeposited(): Promise<bigint> {
   return viewCall<bigint>('get_total_deposited');
 }
 
-/** Formats a raw stroop (1e-7 XLM) bigint as a human-readable string. */
-export function stroopsToDisplay(stroops: bigint, decimals = 7): string {
-  const divisor = BigInt(10 ** decimals);
-  const whole = stroops / divisor;
-  const frac = stroops % divisor;
-  const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '');
-  return fracStr ? `${whole}.${fracStr}` : `${whole}`;
-}
