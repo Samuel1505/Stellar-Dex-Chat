@@ -1,0 +1,12 @@
+# Root-level generated artifacts
+node_modules/
+dex_with_fiat_frontend/.next/
+dex_with_fiat_frontend/node_modules/
+stellar-contracts/target/
+
+# Local environment files
+.env.local
+
+# Contract build artifacts
+*.wasm
+
