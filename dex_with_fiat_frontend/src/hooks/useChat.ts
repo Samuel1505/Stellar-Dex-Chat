@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ChatMessage,
   AIAnalysisResult,
@@ -109,6 +109,32 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const aiAssistant = useMemo(() => new AIAssistant(), []);
+  const activeRequestControllerRef = useRef<AbortController | null>(null);
+
+  const appendCancelledMessage = useCallback((content: string) => {
+    const cancelledMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content,
+      timestamp: new Date(),
+      metadata: {
+        requestStatus: 'cancelled',
+      },
+    };
+    setMessages((prev: ChatMessage[]) => [...prev, cancelledMessage]);
+  }, []);
+
+  const cancelPendingRequest = useCallback(() => {
+    if (!activeRequestControllerRef.current || !isLoading) {
+      return;
+    }
+    activeRequestControllerRef.current.abort();
+    activeRequestControllerRef.current = null;
+    setIsLoading(false);
+    appendCancelledMessage(
+      'Request cancelled. No worries - you can send a new prompt when ready.',
+    );
+  }, [appendCancelledMessage, isLoading]);
 
   useEffect(() => {
     if (!isInitialized) {
@@ -136,6 +162,11 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
 
   const sendMessage = useCallback(
     async (content: string) => {
+      if (isLoading && activeRequestControllerRef.current) {
+        activeRequestControllerRef.current.abort();
+        activeRequestControllerRef.current = null;
+      }
+
       const isCancellation = /cancel|stop|no thanks|nevermind|abort/i.test(
         content,
       );
@@ -159,6 +190,8 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
 
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsLoading(true);
+      const requestController = new AbortController();
+      activeRequestControllerRef.current = requestController;
 
       try {
         const conversationContext = {
@@ -172,10 +205,18 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
         };
 
         perf.mark('AI: Response');
-        const analysis = await aiAssistant.analyzeUserMessage(
-          content,
-          conversationContext,
-        );
+        const abortPromise = new Promise<never>((_, reject) => {
+          requestController.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Request aborted', 'AbortError')),
+            { once: true },
+          );
+        });
+
+        const analysis = await Promise.race([
+          aiAssistant.analyzeUserMessage(content, conversationContext),
+          abortPromise,
+        ]);
         perf.measure('AI: Response');
 
         const newMessageCount = conversationState.messageCount + 1;
@@ -315,6 +356,9 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
           }, 1000);
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
         console.error('Chat error:', error);
         const errorMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -325,10 +369,20 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
         };
         setMessages((prev: ChatMessage[]) => [...prev, errorMessage]);
       } finally {
-        setIsLoading(false);
+        if (activeRequestControllerRef.current === requestController) {
+          activeRequestControllerRef.current = null;
+          setIsLoading(false);
+        }
       }
     },
-    [aiAssistant, conversationState, connection, messages, onTransactionReady],
+    [
+      aiAssistant,
+      conversationState,
+      connection,
+      isLoading,
+      messages,
+      onTransactionReady,
+    ],
   );
 
   const clearChat = useCallback(() => {
@@ -401,6 +455,7 @@ What would you like to do today? I'm here to make your XLM-to-fiat journey smoot
     currentSessionId,
     conversationState,
     setTransactionReadyCallback,
+    cancelPendingRequest,
     setIsAdmin: (isAdmin: boolean) => {
       setConversationState((prev: ConversationState) => ({ ...prev, isAdmin }));
     },

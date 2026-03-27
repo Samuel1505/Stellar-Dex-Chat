@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { X, Check } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -9,6 +9,7 @@ import {
   useUserPreferences,
 } from '@/contexts/UserPreferencesContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { useAccessibleModal } from '@/hooks/useAccessibleModal';
 
 interface UserSettingsProps {
   isOpen: boolean;
@@ -27,21 +28,7 @@ export default function UserSettings({ isOpen, onClose }: UserSettingsProps) {
     setReminderFrequency,
   } = useUserPreferences();
   const panelRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
-
-  // Focus trap: move focus into panel on open
-  useEffect(() => {
-    if (isOpen) panelRef.current?.focus();
-  }, [isOpen]);
+  useAccessibleModal(isOpen, panelRef, onClose);
 
   if (!isOpen) return null;
 

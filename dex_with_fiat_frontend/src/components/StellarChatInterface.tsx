@@ -35,6 +35,7 @@ import { useUserPreferences } from '@/contexts/UserPreferencesContext';
 import { getAdmin, stroopsToDisplay } from '@/lib/stellarContract';
 import { getQueuedReadRequestsCount } from '@/lib/networkQueue';
 import useBridgeStats from '@/hooks/useBridgeStats';
+import WalletConnectionTimeline from './WalletConnectionTimeline';
 
 export default function StellarChatInterface() {
   const {
@@ -78,6 +79,7 @@ export default function StellarChatInterface() {
     messages,
     isLoading,
     sendMessage,
+    cancelPendingRequest,
     clearChat,
     loadChatSession,
     setTransactionReadyCallback,
@@ -627,9 +629,25 @@ export default function StellarChatInterface() {
           )}
           <ChatInput
             onSendMessage={sendMessage}
+            onCancelRequest={cancelPendingRequest}
+            onNewChat={clearChat}
+            onOpenHistory={() => setShowSidebar(true)}
+            onOpenBridgeModal={() => {
+              setIsAdminMode(false);
+              setShowModal(true);
+            }}
             isLoading={isLoading}
             placeholder="Ask about XLM rates, deposit, or anything Stellar…"
           />
+          <div className="px-6 pb-4">
+            <WalletConnectionTimeline
+              isConnected={connection.isConnected}
+              isNetworkMismatch={isNetworkMismatch}
+              isConnecting={false}
+              contextMode={isAdmin ? 'advanced' : 'simple'}
+              onRetry={connect}
+            />
+          </div>
         </div>
       </div>
 

@@ -133,6 +133,18 @@ export default function Message({ message, onActionClick }: MessageProps) {
                 </span>
               </div>
             )}
+            {message.metadata?.requestStatus === 'cancelled' && (
+              <div
+                className={`mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                  isDarkMode
+                    ? 'border-sky-700 bg-sky-950/40 text-sky-200'
+                    : 'border-sky-200 bg-sky-50 text-sky-800'
+                }`}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <span>Request cancelled by user.</span>
+              </div>
+            )}
             {message.metadata?.suggestedActions &&
               message.metadata.suggestedActions.length > 0 && (
                 <div

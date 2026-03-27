@@ -1,23 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
+  onCancelRequest?: () => void;
+  onNewChat?: () => void;
+  onOpenHistory?: () => void;
+  onOpenBridgeModal?: () => void;
   isLoading: boolean;
   placeholder?: string;
 }
 
 export default function ChatInput({
   onSendMessage,
+  onCancelRequest,
+  onNewChat,
+  onOpenHistory,
+  onOpenBridgeModal,
   isLoading,
   placeholder = 'Type your message...',
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [showCommands, setShowCommands] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showPalette, setShowPalette] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [paletteIndex, setPaletteIndex] = useState(0);
 
   const commands = [
     { cmd: '/deposit', desc: 'Add funds to your Stellar account' },
@@ -75,11 +86,124 @@ export default function ChatInput({
     }
   };
 
+  const paletteCommands = [
+    {
+      id: 'new_chat',
+      label: 'New Chat',
+      keywords: 'new chat clear',
+      run: () => onNewChat?.(),
+    },
+    {
+      id: 'switch_thread',
+      label: 'Switch Thread',
+      keywords: 'switch thread history',
+      run: () => onOpenHistory?.(),
+    },
+    {
+      id: 'open_bridge_modal',
+      label: 'Open Bridge Modal',
+      keywords: 'bridge modal deposit',
+      run: () => onOpenBridgeModal?.(),
+    },
+    {
+      id: 'cancel_request',
+      label: 'Cancel Pending Request',
+      keywords: 'cancel stop abort request',
+      run: () => onCancelRequest?.(),
+    },
+  ];
+
+  const normalizedQuery = paletteQuery.trim().toLowerCase();
+  const filteredPalette = paletteCommands.filter((cmd) => {
+    if (!normalizedQuery) {
+      return true;
+    }
+    return (
+      cmd.label.toLowerCase().includes(normalizedQuery) ||
+      cmd.keywords.includes(normalizedQuery)
+    );
+  });
+
+  const executePaletteCommand = (idx: number) => {
+    const selected = filteredPalette[idx];
+    if (!selected) {
+      return;
+    }
+    selected.run();
+    setShowPalette(false);
+    setPaletteQuery('');
+    setPaletteIndex(0);
+  };
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setShowPalette((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <form
       onSubmit={handleSubmit}
       className="theme-surface p-6 transition-colors duration-300 relative"
     >
+      {showPalette && (
+        <div className="absolute inset-x-6 bottom-full mb-3 rounded-xl border theme-surface shadow-2xl z-50">
+          <div className="p-3 border-b">
+            <input
+              value={paletteQuery}
+              onChange={(e) => {
+                setPaletteQuery(e.target.value);
+                setPaletteIndex(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setPaletteIndex((prev) =>
+                    filteredPalette.length > 0
+                      ? (prev + 1) % filteredPalette.length
+                      : 0,
+                  );
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setPaletteIndex((prev) =>
+                    filteredPalette.length > 0
+                      ? (prev - 1 + filteredPalette.length) %
+                        filteredPalette.length
+                      : 0,
+                  );
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  executePaletteCommand(paletteIndex);
+                } else if (e.key === 'Escape') {
+                  setShowPalette(false);
+                }
+              }}
+              autoFocus
+              placeholder="Type a command..."
+              className="theme-input w-full rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            {filteredPalette.map((cmd, i) => (
+              <button
+                key={cmd.id}
+                type="button"
+                onClick={() => executePaletteCommand(i)}
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  i === paletteIndex ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                {cmd.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <AnimatePresence>
         {showCommands && (
           <motion.div

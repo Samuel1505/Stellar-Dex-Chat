@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { pollTransaction } from '@/lib/stellarContract';
 import {
@@ -30,6 +30,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useTxHistory } from '@/hooks/useTxHistory';
 import { downloadReceipt } from '@/lib/receipt';
 import type { ChatMessage } from '@/types';
+import { useAccessibleModal } from '@/hooks/useAccessibleModal';
 
 interface StellarFiatModalProps {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export default function StellarFiatModal({
   onDepositSuccess,
   messages = [],
 }: StellarFiatModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const { connection, signTx } = useStellarWallet();
   const { addNotification } = useNotifications();
   const { addEntry } = useTxHistory();
@@ -336,6 +338,8 @@ export default function StellarFiatModal({
   const operationType = isAdminMode ? 'Withdraw' : 'Deposit';
   const txNetwork = connection.network || 'TESTNET';
 
+  useAccessibleModal(isOpen, modalRef, onClose);
+
   useEffect(() => {
     if (
       !isOpen ||
@@ -516,8 +520,11 @@ export default function StellarFiatModal({
   return (
     <div className="theme-overlay fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
       <div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
+        aria-label={isAdminMode ? 'Withdraw from Bridge' : 'Deposit to Bridge'}
+        tabIndex={-1}
         className="theme-surface theme-border relative w-full max-w-md mx-4 border rounded-2xl shadow-2xl p-6"
       >
         <div className="flex items-center justify-between mb-6">

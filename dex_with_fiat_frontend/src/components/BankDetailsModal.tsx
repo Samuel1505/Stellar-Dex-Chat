@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   Loader2,
@@ -25,6 +25,7 @@ import TransferTimeline, {
   StatusEvent,
   TransferStatus,
 } from '@/components/TransferTimeline';
+import { useAccessibleModal } from '@/hooks/useAccessibleModal';
 
 interface Bank {
   id: number;
@@ -65,6 +66,7 @@ export default function BankDetailsModal({
   onClose,
   xlmAmount,
 }: BankDetailsModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const {
     beneficiaries,
     isLoaded: beneficiariesLoaded,
@@ -413,11 +415,20 @@ export default function BankDetailsModal({
     setSaveCustomName('');
   };
 
+  useAccessibleModal(isOpen, modalRef, onClose);
+
   if (!isOpen) return null;
 
   return (
     <div className="theme-overlay fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-      <div className="theme-surface theme-border relative w-full max-w-md mx-4 border rounded-2xl shadow-2xl p-6">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Fiat payout"
+        tabIndex={-1}
+        className="theme-surface theme-border relative w-full max-w-md mx-4 border rounded-2xl shadow-2xl p-6"
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">

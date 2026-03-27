@@ -13,6 +13,7 @@ export interface ChatMessage {
     guardrail?: GuardrailResult;
     lowConfidence?: boolean;
     clarificationQuestion?: string;
+    requestStatus?: 'cancelled';
   };
 }
 
