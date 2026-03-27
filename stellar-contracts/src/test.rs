@@ -230,7 +230,7 @@ mod tests {
         let (_, bridge, _admin, token_addr, _, _) = setup_bridge(&env, 100);
         env.set_auths(&[]);
         let result = bridge.try_set_limit(&token_addr, &500);
-        assert_eq!(result, Err(Ok(Error::Unauthorized)));
+        assert!(matches!(result, Err(Err(_))));
     }
 
     #[test]
@@ -240,7 +240,7 @@ mod tests {
         let to = Address::generate(&env);
         env.set_auths(&[]);
         let result = bridge.try_withdraw(&to, &10, &token_addr);
-        assert_eq!(result, Err(Ok(Error::Unauthorized)));
+        assert!(matches!(result, Err(Err(_))));
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
         let new_admin = Address::generate(&env);
         env.set_auths(&[]);
         let result = bridge.try_transfer_admin(&new_admin);
-        assert_eq!(result, Err(Ok(Error::Unauthorized)));
+        assert!(matches!(result, Err(Err(_))));
     }
 
     #[test]

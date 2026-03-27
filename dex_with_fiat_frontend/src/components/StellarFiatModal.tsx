@@ -333,6 +333,9 @@ export default function StellarFiatModal({
       riskConfirmation.trim().toUpperCase() !== RISK_CONFIRMATION_PHRASE) ||
     Date.now() - lastActionTimestamp < SUBMIT_COOLDOWN_MS;
 
+  const operationType = isAdminMode ? 'Withdraw' : 'Deposit';
+  const txNetwork = connection.network || 'TESTNET';
+
   useEffect(() => {
     if (
       !isOpen ||
